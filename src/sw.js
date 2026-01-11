@@ -1,5 +1,13 @@
-const CACHE_NAME = "alcohol-monopoly-icon-v1"; // 更改名稱以區隔舊的完整快取
+const CACHE_NAME = "alcohol-monopoly-v2"; // 更新版本號以套用新快取
 const ASSETS = [
+  "./",
+  "./index.html",
+  "./style.css",
+  "./script.js",
+  "./data.js",
+  "./manifest.json",
+  "https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css",
+  "https://html2canvas.hertzen.com/dist/html2canvas.min.js",
   "https://cdn-icons-png.flaticon.com/512/931/931949.png", // 快取 PWA 圖示
   // 如果有本地音效檔，建議也加進來，例如：
   // './sounds/dice.mp3',
