@@ -845,6 +845,7 @@ function initSettings() {
   importFileInput.onchange = importGameData; // 綁定檔案選擇事件
   fullResetBtn.onclick = () => {
     if (confirm("確定要重置所有遊戲進度嗎？這將回到初始畫面。")) {
+      localStorage.removeItem("alcohol_monopoly_save_v1");
       location.reload();
     }
   };
@@ -1622,6 +1623,7 @@ window.deletePlayer = function (id) {
 
   if (players.length === 0) {
     alert("所有玩家都已刪除！遊戲將重置。");
+    localStorage.removeItem("alcohol_monopoly_save_v1");
     location.reload();
     return;
   }
@@ -1724,14 +1726,7 @@ function initSetup() {
 
   // === 檢查是否有存檔 ===
   if (localStorage.getItem("alcohol_monopoly_save_v1")) {
-    const resumeBtn = document.createElement("button");
-    resumeBtn.className =
-      "w-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transform transition hover:scale-105 mb-3 border-2 border-green-300";
-    resumeBtn.innerHTML = "📂 繼續上次遊戲";
-    resumeBtn.onclick = loadGame;
-
-    // 插入在開始遊戲按鈕之前
-    startGameBtn.parentNode.insertBefore(resumeBtn, startGameBtn);
+    loadGame();
   }
 
   // === 鍵盤快捷鍵支援 ===
@@ -1811,6 +1806,17 @@ function addPlayerInput() {
 
 // === 開始遊戲 ===
 function startGame() {
+  // 防呆機制：檢查是否已有存檔，避免誤觸覆蓋
+  if (localStorage.getItem("alcohol_monopoly_save_v1")) {
+    if (
+      !confirm(
+        "偵測到尚未結束的遊戲存檔，開始新遊戲將會覆蓋舊紀錄。\n確定要重新開始嗎？"
+      )
+    ) {
+      return;
+    }
+  }
+
   const inputs = document.querySelectorAll(".player-name-input");
   players = [];
 
@@ -2376,6 +2382,7 @@ window.continueGame = function () {
 
 window.restartGame = function () {
   if (confirm("確定要重新開始新的一局嗎？")) {
+    localStorage.removeItem("alcohol_monopoly_save_v1");
     location.reload();
   }
 };
@@ -2477,6 +2484,7 @@ function loadGame() {
     setupScreen.classList.add("hidden");
     landingPage.classList.add("hidden");
     gameContainer.classList.remove("hidden");
+    requestWakeLock(); // 嘗試啟用螢幕恆亮
 
     // 初始化介面
     initGame();
@@ -2488,7 +2496,7 @@ function loadGame() {
     settingLimitDisplay.innerText = maxDrinksLimit; // 更新設定顯示
     initMapEditor(); // 確保編輯器資料同步
 
-    alert("已恢復上次的遊戲進度！");
+    // alert("已恢復上次的遊戲進度！");
   } catch (e) {
     console.error("讀取存檔失敗:", e);
     alert("存檔損毀，無法讀取。");
