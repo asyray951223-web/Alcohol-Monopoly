@@ -2336,6 +2336,7 @@ function showGameOverScreen() {
   gameContainer.classList.add("hidden");
   modal.classList.add("hidden"); // 確保彈窗關閉
   gameOverContainer.classList.remove("hidden");
+  triggerConfetti(); // 觸發彩帶特效
 
   // 找出達到上限的玩家
   const loser = players.find((p) => p.drinkCount >= maxDrinksLimit);
@@ -2515,6 +2516,41 @@ function handleGlobalKeydown(e) {
       e.preventDefault(); // 防止捲動頁面
       handleRollDice();
     }
+  }
+}
+
+// === 新增功能：彩帶特效 (Confetti) ===
+function triggerConfetti() {
+  const colors = ["#ec4899", "#8b5cf6", "#fbbf24", "#10b981", "#3b82f6"];
+  const count = 150;
+
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement("div");
+    el.className = "fixed z-50 w-3 h-3 rounded-full pointer-events-none";
+    el.style.backgroundColor =
+      colors[Math.floor(Math.random() * colors.length)];
+    el.style.left = Math.random() * 100 + "vw";
+    el.style.top = "-20px";
+    el.style.opacity = 1;
+    document.body.appendChild(el);
+
+    const duration = Math.random() * 2000 + 1500;
+    const x = Math.random() * 200 - 100;
+    const rotate = Math.random() * 720;
+
+    el.animate(
+      [
+        { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
+        {
+          transform: `translate(${x}px, 100vh) rotate(${rotate}deg)`,
+          opacity: 0,
+        },
+      ],
+      {
+        duration: duration,
+        easing: "cubic-bezier(0.25, 1, 0.5, 1)",
+      }
+    ).onfinish = () => el.remove();
   }
 }
 
