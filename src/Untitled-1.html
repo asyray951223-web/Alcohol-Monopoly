@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>酒精大富翁 Alcohol Monopoly</title>
+    <!-- 引入 Tailwind CSS 2 (CDN) -->
+    <link
+      href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+
+    <!-- PWA 設定 -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#111827" />
+
+    <!-- html2canvas 用於截圖 -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      /* 3D 骰子樣式 */
+      .dice-scene {
+        perspective: 600px;
+        width: 200px;
+        height: 200px;
+        --card-bg: #ffffff;
+        --accent-color: #d1d5db; /* gray-300 */
+      }
+      .dice-cube {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        transform-style: preserve-3d;
+        transition: transform 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      .dice-face {
+        position: absolute;
+        width: 200px;
+        height: 200px;
+        background: var(--card-bg);
+        border: 4px solid var(--accent-color);
+        border-radius: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 100px;
+        color: #000;
+        box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.1);
+        backface-visibility: hidden;
+      }
+      /* 確保背面不透明 */
+      .dice-face::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: var(--card-bg);
+        border-radius: 26px;
+        z-index: -1;
+      }
+      /* 骰子六面定位 */
+      .face-1 {
+        transform: rotateY(0deg) translateZ(100px);
+      }
+      .face-2 {
+        transform: rotateY(180deg) translateZ(100px);
+      }
+      .face-3 {
+        transform: rotateY(90deg) translateZ(100px);
+      }
+      .face-4 {
+        transform: rotateY(-90deg) translateZ(100px);
+      }
+      .face-5 {
+        transform: rotateX(90deg) translateZ(100px);
+      }
+      .face-6 {
+        transform: rotateX(-90deg) translateZ(100px);
+      }
+
+      /* 容器縮放輔助 (用於將 200px 的骰子縮放到 UI 中) */
+      .dice-scale-wrapper {
+        transform-origin: center center;
+      }
+
+      /* RWD 骰子縮放設定 */
+      .dice-scale-main {
+        transform: scale(0.3); /* 手機版放大至 0.3 (60px) */
+      }
+      @media (min-width: 768px) {
+        .dice-scale-main {
+          transform: scale(0.35); /* 電腦版維持 0.35 (70px) */
+        }
+      }
+
+      /* 觀戰模式樣式 (由 JS 切換 class 使用) */
+      .spectator-mode {
+        opacity: 0.4;
+        filter: grayscale(100%);
+      }
+
+      /* 浮動動畫樣式 (用於獲得金牌或加分時) */
+      .float-plus-one {
+        position: fixed;
+        color: #fbbf24; /* yellow-400 */
+        font-weight: bold;
+        pointer-events: none;
+        animation: floatUp 1.5s ease-out forwards;
+        z-index: 100;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+      }
+      @keyframes floatUp {
+        0% {
+          transform: translate(-50%, 0) scale(1);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(-50%, -80px) scale(1.2);
+          opacity: 0;
+        }
+      }
+
+      /* 彈窗震動特效 */
+      .animate-shake {
+        animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+      }
+      @keyframes shake {
+        10%,
+        90% {
+          transform: scale(1) translate3d(-2px, 0, 0);
+        }
+        20%,
+        80% {
+          transform: scale(1) translate3d(4px, 0, 0);
+        }
+        30%,
+        50%,
+        70% {
+          transform: scale(1) translate3d(-6px, 0, 0);
+        }
+        40%,
+        60% {
+          transform: scale(1) translate3d(6px, 0, 0);
+        }
+      }
+    </style>
+  </head>
+  <body
+    class="text-white h-screen flex flex-col items-center justify-center overflow-hidden bg-gray-900"
+  >
+    <!-- 左側選單按鈕 (Hamburger Button) -->
+    <button
+      id="menu-btn"
+      class="fixed top-4 left-4 z-50 p-2 bg-gray-800 rounded-full border border-gray-600 shadow-lg text-white focus:outline-none hover:bg-gray-700 transition"
+    >
+      <svg
+        class="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 6h16M4 12h16M4 18h16"
+        ></path>
+      </svg>
+    </button>
+
+    <!-- 選單遮罩層 (Overlay) -->
+    <div
+      id="sidebar-overlay"
+      class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden transition-opacity duration-300 opacity-0 backdrop-filter backdrop-blur-sm"
+    ></div>
+
+    <!-- 左側滑動選單 (Sidebar) -->
+    <div
+      id="sidebar"
+      class="fixed top-0 left-0 h-full w-64 bg-gray-900 border-r border-purple-500 shadow-2xl z-50 transform -translate-x-full transition-transform duration-300 flex flex-col"
+    >
+      <div
+        class="p-6 border-b border-gray-800 flex justify-between items-center"
+      >
+        <h2
+          class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 neon-text"
+        >
+          選單
+        </h2>
+        <button
+          id="close-menu-btn"
+          class="text-gray-400 hover:text-white transition"
+        >
+          <svg
+            class="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            ></path>
+          </svg>
+        </button>
+      </div>
+      <nav class="flex-1 overflow-y-auto py-4">
+        <ul class="space-y-1 px-3">
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="home"
+            >
+              <span>🏠</span>
+              <span>主頁</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="players"
+            >
+              <span>👥</span>
+              <span>玩家</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="cards"
+            >
+              <span>🃏</span>
+              <span>卡牌管理</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="map"
+            >
+              <span>🗺️</span>
+              <span>地圖編輯</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="leaderboard"
+            >
+              <span>🏆</span>
+              <span>排行榜</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="history"
+            >
+              <span>📜</span>
+              <span>歷史紀錄</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="dice"
+            >
+              <span>🎲</span>
+              <span>骰子</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="roulette"
+            >
+              <span>🔫</span>
+              <span>俄羅斯輪盤</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="timer"
+            >
+              <span>⏱️</span>
+              <span>計時器</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="settings"
+            >
+              <span>⚙️</span>
+              <span>設定</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="help"
+            >
+              <span>ℹ️</span>
+              <span>幫助與說明</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+      <div
+        class="p-4 border-t border-gray-800 text-xs text-gray-600 text-center"
+      >
+        Alcohol Monopoly v1.1
+      </div>
+    </div>
+
+    <!-- 導覽頁 (Landing Page) -->
+    <div
+      id="landing-page"
+      class="fixed inset-0 z-50 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full"
+    >
+      <div class="text-center animate-fade-in">
+        <div class="text-4xl md:text-6xl mb-4">🍻</div>
+        <h1
+          class="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 neon-text mb-2"
+        >
+          酒精大富翁
+        </h1>
+        <h2 class="text-2xl text-gray-400 tracking-widest mb-12 font-light">
+          ALCOHOL MONOPOLY
+        </h2>
+
+        <button
+          id="enter-game-btn"
+          class="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white text-xl font-bold py-4 px-12 rounded-full shadow-lg transform transition hover:scale-105 neon-box"
+        >
+          進入酒局
+        </button>
+
+        <div class="mt-12 text-gray-600 text-sm">
+          <p>⚠️ 理性飲酒，安全回家</p>
+          <p>未滿 18 歲請勿飲酒</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 骰子頁面 (Dice Page) -->
+    <div
+      id="dice-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 neon-text mb-12"
+      >
+        🎲 擲骰子
+      </h2>
+
+      <!-- 骰子顯示區域 -->
+      <div
+        id="standalone-dice-wrapper"
+        class="flex flex-wrap gap-4 mb-8 justify-center w-full max-w-4xl min-h-[10rem]"
+      >
+        <!-- JS 動態生成骰子 -->
+      </div>
+
+      <!-- 骰子數量切換 -->
+      <div
+        class="flex items-center space-x-4 mb-8 bg-gray-800 p-2 rounded-lg border border-gray-700"
+      >
+        <span class="text-gray-400 text-sm font-bold ml-2">數量:</span>
+        <button
+          id="dice-count-minus"
+          class="w-10 h-10 bg-gray-700 hover:bg-gray-600 rounded text-white font-bold text-xl transition"
+        >
+          -
+        </button>
+        <span
+          id="dice-count-display"
+          class="text-2xl font-bold w-12 text-center text-purple-400"
+          >1</span
+        >
+        <button
+          id="dice-count-plus"
+          class="w-10 h-10 bg-purple-600 hover:bg-purple-500 rounded text-white font-bold text-xl transition shadow-lg"
+        >
+          +
+        </button>
+      </div>
+
+      <button
+        id="standalone-roll-btn"
+        class="w-full max-w-xs bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-4 px-8 rounded-full shadow-lg transform transition active:scale-95 mb-8 text-xl border-b-4 border-blue-800"
+      >
+        擲骰子
+      </button>
+
+      <div
+        id="dice-total-display"
+        class="text-2xl font-mono text-yellow-400 font-bold h-8 mb-4 opacity-0 transition-opacity"
+      >
+        總和: <span id="dice-total-value">0</span>
+      </div>
+
+      <button
+        id="dice-back-btn"
+        class="text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
+    <!-- 俄羅斯輪盤 (Russian Roulette) -->
+    <div
+      id="roulette-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-yellow-500 neon-text mb-8"
+      >
+        俄羅斯輪盤
+      </h2>
+
+      <!-- 彈巢視覺 (Cylinder) -->
+      <div
+        id="cylinder"
+        class="relative w-64 h-64 rounded-full border-8 border-gray-700 bg-gray-800 mb-12 shadow-2xl flex items-center justify-center transition-transform duration-200"
+      >
+        <!-- 中心軸 -->
+        <div
+          class="absolute w-8 h-8 bg-gray-500 rounded-full z-10 shadow-inner"
+        ></div>
+        <!-- 6個彈孔 (使用 inline style 旋轉定位) -->
+        <div
+          class="chamber absolute w-12 h-12 bg-gray-900 rounded-full border-4 border-gray-600 shadow-inner"
+          style="transform: rotate(0deg) translate(0, -80px)"
+        ></div>
+        <div
+          class="chamber absolute w-12 h-12 bg-gray-900 rounded-full border-4 border-gray-600 shadow-inner"
+          style="transform: rotate(60deg) translate(0, -80px)"
+        ></div>
+        <div
+          class="chamber absolute w-12 h-12 bg-gray-900 rounded-full border-4 border-gray-600 shadow-inner"
+          style="transform: rotate(120deg) translate(0, -80px)"
+        ></div>
+        <div
+          class="chamber absolute w-12 h-12 bg-gray-900 rounded-full border-4 border-gray-600 shadow-inner"
+          style="transform: rotate(180deg) translate(0, -80px)"
+        ></div>
+        <div
+          class="chamber absolute w-12 h-12 bg-gray-900 rounded-full border-4 border-gray-600 shadow-inner"
+          style="transform: rotate(240deg) translate(0, -80px)"
+        ></div>
+        <div
+          class="chamber absolute w-12 h-12 bg-gray-900 rounded-full border-4 border-gray-600 shadow-inner"
+          style="transform: rotate(300deg) translate(0, -80px)"
+        ></div>
+      </div>
+
+      <button
+        id="fire-btn"
+        class="w-full max-w-xs bg-gradient-to-b from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white font-bold py-4 px-8 rounded-full shadow-lg transform transition active:scale-95 mb-6 text-xl border-b-4 border-red-900"
+      >
+        開槍 (FIRE)
+      </button>
+
+      <button
+        id="roulette-back-btn"
+        class="text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
+    <!-- 計時器 (Timer) -->
+    <div
+      id="timer-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 neon-text mb-8"
+      >
+        倒數計時器
+      </h2>
+
+      <!-- 時間顯示 -->
+      <div
+        id="timer-display"
+        class="text-7xl font-mono font-bold text-white mb-8 neon-text tracking-widest"
+      >
+        00:00
+      </div>
+
+      <!-- 快速設定按鈕 -->
+      <div class="grid grid-cols-4 gap-2 mb-8 w-full max-w-xs">
+        <button
+          class="timer-preset-btn bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white py-2 rounded transition"
+          data-time="10"
+        >
+          +10s
+        </button>
+        <button
+          class="timer-preset-btn bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white py-2 rounded transition"
+          data-time="30"
+        >
+          +30s
+        </button>
+        <button
+          class="timer-preset-btn bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white py-2 rounded transition"
+          data-time="60"
+        >
+          +1m
+        </button>
+        <button
+          class="timer-preset-btn bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white py-2 rounded transition"
+          data-time="300"
+        >
+          +5m
+        </button>
+      </div>
+
+      <!-- 控制按鈕 -->
+      <div class="flex space-x-6 mb-10">
+        <button
+          id="timer-start-btn"
+          class="w-24 h-24 rounded-full bg-green-600 hover:bg-green-500 text-white font-bold text-xl shadow-lg transition flex items-center justify-center border-4 border-green-800"
+        >
+          開始
+        </button>
+        <button
+          id="timer-reset-btn"
+          class="w-24 h-24 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-xl shadow-lg transition flex items-center justify-center border-4 border-red-800"
+        >
+          重置
+        </button>
+      </div>
+
+      <button
+        id="timer-back-btn"
+        class="text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
+    <!-- 玩家列表 (Players) -->
+    <div
+      id="players-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-teal-400 neon-text mb-6"
+      >
+        👥 玩家列表
+      </h2>
+
+      <div
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl border border-blue-500 shadow-2xl overflow-hidden flex-1 max-h-[70vh] flex flex-col p-4"
+      >
+        <!-- 新增列表標題列 -->
+        <div
+          class="flex items-center justify-between pb-2 mb-2 border-b border-gray-700 text-gray-400 text-xs font-bold px-2"
+        >
+          <div class="flex-1">玩家名稱</div>
+          <div class="flex items-center space-x-3">
+            <div class="w-12 text-center">杯數</div>
+            <div class="w-12 text-center">觀戰</div>
+          </div>
+        </div>
+        <div
+          id="players-list-content"
+          class="space-y-3 overflow-y-auto custom-scrollbar flex-1"
+        >
+          <!-- JS 動態生成 -->
+        </div>
+      </div>
+
+      <div class="flex space-x-6 mt-8">
+        <button
+          onclick="addNewPlayerInGame()"
+          class="text-green-400 hover:text-white flex items-center space-x-2 transition"
+          title="新增一位玩家"
+        >
+          <span>➕</span> <span>新增玩家</span>
+        </button>
+        <button
+          onclick="clearAllSpectators()"
+          class="text-blue-400 hover:text-white flex items-center space-x-2 transition"
+          title="讓所有玩家回到遊戲"
+        >
+          <span>👁️</span> <span>全部解除觀戰</span>
+        </button>
+        <button
+          id="players-back-btn"
+          class="text-gray-400 hover:text-white flex items-center space-x-2 transition"
+        >
+          <span>↩️</span> <span>返回遊戲</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 排行榜 (Leaderboard) -->
+    <div
+      id="leaderboard-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600 neon-text mb-6"
+      >
+        🏆 酒量排行榜 🏆
+      </h2>
+
+      <div
+        id="leaderboard-card"
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl border border-yellow-600 shadow-2xl overflow-hidden flex-1 max-h-[60vh] flex flex-col"
+      >
+        <div
+          class="p-3 bg-gray-700 border-b border-gray-600 grid grid-cols-12 gap-2 text-gray-300 font-bold text-sm text-center"
+        >
+          <div class="col-span-2">排名</div>
+          <div class="col-span-4 text-left pl-2">玩家</div>
+          <div class="col-span-3">杯數</div>
+          <div class="col-span-3">調整</div>
+        </div>
+        <div
+          id="leaderboard-list"
+          class="overflow-y-auto p-2 space-y-2 custom-scrollbar"
+        >
+          <!-- JS 動態生成 -->
+        </div>
+      </div>
+
+      <div class="flex space-x-6 mt-8">
+        <button
+          id="leaderboard-share-btn"
+          class="text-green-400 hover:text-white flex items-center space-x-2 transition"
+        >
+          <span>📸</span> <span>截圖下載</span>
+        </button>
+        <button
+          id="leaderboard-back-btn"
+          class="text-gray-400 hover:text-white flex items-center space-x-2 transition"
+        >
+          <span>↩️</span> <span>返回遊戲</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 遊戲結算畫面 (Game Over) -->
+    <div
+      id="game-over-container"
+      class="fixed inset-0 z-50 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <div class="text-4xl md:text-6xl mb-4 animate-bounce">🏆</div>
+      <h2
+        class="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 neon-text mb-2"
+      >
+        遊戲結束
+      </h2>
+      <p id="game-over-reason" class="text-gray-400 mb-8 text-center">
+        有人已經不省人事了...
+      </p>
+
+      <div
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl border border-yellow-600 shadow-2xl overflow-hidden flex-1 max-h-[60vh] flex flex-col"
+      >
+        <div
+          class="p-3 bg-gray-700 border-b border-gray-600 grid grid-cols-12 gap-2 text-gray-300 font-bold text-sm text-center"
+        >
+          <div class="col-span-2">排名</div>
+          <div class="col-span-6 text-left pl-2">玩家</div>
+          <div class="col-span-4">總杯數</div>
+        </div>
+        <div
+          id="game-over-list"
+          class="overflow-y-auto p-2 space-y-2 custom-scrollbar"
+        >
+          <!-- JS 動態生成 -->
+        </div>
+      </div>
+
+      <div class="flex space-x-4 mt-8">
+        <button
+          onclick="continueGame()"
+          class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-xl transition shadow-lg border border-gray-500"
+        >
+          繼續遊戲 (+5杯)
+        </button>
+        <button
+          onclick="restartGame()"
+          class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transform transition hover:scale-105"
+        >
+          重新開始
+        </button>
+      </div>
+    </div>
+
+    <!-- 卡牌管理 (Cards) -->
+    <div
+      id="cards-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-500 neon-text mb-6"
+      >
+        🃏 卡牌管理
+      </h2>
+
+      <div
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl border border-gray-600 shadow-2xl overflow-hidden flex-1 max-h-[70vh] flex flex-col p-4"
+      >
+        <div class="flex space-x-2 mb-2">
+          <button
+            id="cards-tab-chance"
+            class="flex-1 py-2 rounded-t-lg bg-gray-700 text-gray-400 hover:bg-gray-600 font-bold transition"
+          >
+            機會卡牌
+          </button>
+          <button
+            id="cards-tab-fate"
+            class="flex-1 py-2 rounded-t-lg bg-gray-900 text-pink-500 border-t-2 border-pink-500 font-bold transition"
+          >
+            命運卡牌
+          </button>
+        </div>
+
+        <div
+          class="bg-gray-900 border border-gray-700 rounded-b-lg p-2 flex-1 flex flex-col min-h-0"
+        >
+          <div
+            id="cards-list"
+            class="flex-1 overflow-y-auto space-y-2 mb-2 custom-scrollbar pr-1"
+          >
+            <!-- 卡牌列表 JS 動態生成 -->
+          </div>
+          <div class="flex space-x-2 mt-2">
+            <input
+              id="new-card-input"
+              type="text"
+              placeholder="輸入新內容..."
+              class="flex-1 bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-pink-500"
+            />
+            <button
+              id="add-card-btn"
+              class="bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded font-bold"
+            >
+              +
+            </button>
+          </div>
+          <div class="mt-2 pt-2 border-t border-gray-700">
+            <button
+              id="reset-cards-btn"
+              class="w-full text-xs text-gray-500 hover:text-gray-300 transition py-1"
+            >
+              ↺ 重置為預設卡牌
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button
+        id="cards-back-btn"
+        class="mt-8 text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
+    <!-- 地圖編輯器 (Map Editor) -->
+    <div
+      id="map-editor-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-blue-500 neon-text mb-6"
+      >
+        🗺️ 地圖編輯器
+      </h2>
+
+      <div
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl border border-gray-600 shadow-2xl overflow-hidden flex-1 max-h-[70vh] flex flex-col p-4"
+      >
+        <div
+          id="map-editor-panel"
+          class="bg-gray-900 border border-gray-700 rounded-lg p-3 flex-1 flex flex-col min-h-0"
+        >
+          <!-- 地圖尺寸設定 -->
+          <div
+            class="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-gray-700"
+          >
+            <div>
+              <label class="text-xs text-gray-400 block mb-1"
+                >地圖寬度 (格數)</label
+              >
+              <input
+                id="map-width-input"
+                type="number"
+                min="3"
+                max="20"
+                value="10"
+                class="w-full bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-blue-500 text-center font-bold"
+              />
+            </div>
+            <div>
+              <label class="text-xs text-gray-400 block mb-1"
+                >地圖高度 (格數)</label
+              >
+              <input
+                id="map-height-input"
+                type="number"
+                min="3"
+                max="14"
+                value="6"
+                class="w-full bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-blue-500 text-center font-bold"
+              />
+            </div>
+          </div>
+
+          <!-- 隨機生成按鈕 -->
+          <button
+            id="random-map-btn"
+            class="w-full bg-purple-700 hover:bg-purple-600 text-white font-bold py-2 rounded-lg mb-4 shadow transition flex items-center justify-center space-x-2"
+          >
+            <span>🎲</span> <span>隨機生成地圖內容</span>
+          </button>
+
+          <div class="mb-3">
+            <label class="text-xs text-gray-400 block mb-1"
+              >選擇要編輯的格子</label
+            >
+            <select
+              id="map-tile-select"
+              class="w-full bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-blue-500"
+            >
+              <!-- JS 動態生成選項 -->
+            </select>
+          </div>
+
+          <div class="space-y-3 overflow-y-auto custom-scrollbar pr-1 flex-1">
+            <div>
+              <label class="text-xs text-gray-400 block mb-1"
+                >名稱 (顯示在格子上)</label
+              >
+              <input
+                id="map-tile-text"
+                type="text"
+                class="w-full bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label class="text-xs text-gray-400 block mb-1"
+                >類型 (決定顏色與圖示)</label
+              >
+              <select
+                id="map-tile-type"
+                class="w-full bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-blue-500"
+              >
+                <option value="start">🏁 起點 (Start)</option>
+                <option value="normal">🎲 普通 (Normal)</option>
+                <option value="chance">❓ 機會 (Chance)</option>
+                <option value="fate">🔮 命運 (Fate)</option>
+                <option value="jail">🛑 暫停/廁所 (Jail)</option>
+                <option value="punish">🍺 懲罰 (Punish)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs text-gray-400 block mb-1"
+                >描述 (彈窗內容)</label
+              >
+              <textarea
+                id="map-tile-desc"
+                rows="3"
+                class="w-full bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-blue-500"
+              ></textarea>
+            </div>
+          </div>
+
+          <button
+            id="save-tile-btn"
+            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-lg mt-3 shadow-lg transition"
+          >
+            儲存修改
+          </button>
+        </div>
+      </div>
+
+      <button
+        id="map-editor-back-btn"
+        class="mt-8 text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
+    <!-- 設定頁面 (Settings) -->
+    <div
+      id="settings-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gray-200 to-gray-400 neon-text mb-6"
+      >
+        ⚙️ 遊戲設定
+      </h2>
+
+      <div
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl border border-gray-600 shadow-2xl overflow-hidden flex-1 max-h-[70vh] flex flex-col p-4"
+      >
+        <!-- 音效設定 -->
+        <div class="mb-6 p-3 bg-gray-700 rounded-lg">
+          <div class="flex justify-between items-center mb-4">
+            <span class="text-lg font-bold text-gray-200"
+              >🔊 遊戲音效 (SFX)</span
+            >
+            <button
+              id="sound-toggle-btn"
+              class="w-14 h-8 rounded-full bg-green-500 relative transition-colors duration-300 focus:outline-none"
+            >
+              <div
+                id="sound-toggle-circle"
+                class="w-6 h-6 bg-white rounded-full absolute top-1 left-7 transition-all duration-300 shadow-md"
+              ></div>
+            </button>
+          </div>
+          <div
+            class="flex justify-between items-center border-t border-gray-600 pt-4"
+          >
+            <span class="text-lg font-bold text-gray-200"
+              >🎵 背景音樂 (BGM)</span
+            >
+            <button
+              id="bgm-toggle-btn"
+              class="w-14 h-8 rounded-full bg-gray-500 relative transition-colors duration-300 focus:outline-none"
+            >
+              <div
+                id="bgm-toggle-circle"
+                class="w-6 h-6 bg-white rounded-full absolute top-1 left-1 transition-all duration-300 shadow-md"
+              ></div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 結束條件設定 (New) -->
+        <div
+          class="flex justify-between items-center mb-6 p-3 bg-gray-700 rounded-lg"
+        >
+          <span class="text-lg font-bold text-gray-200"
+            >🏁 結束條件 (杯數)</span
+          >
+          <div class="flex items-center space-x-3">
+            <button
+              id="setting-limit-minus"
+              class="w-8 h-8 bg-gray-600 hover:bg-gray-500 rounded text-white font-bold transition"
+            >
+              -
+            </button>
+            <span
+              id="setting-limit-display"
+              class="text-xl font-bold text-pink-400 w-8 text-center"
+              >20</span
+            >
+            <button
+              id="setting-limit-plus"
+              class="w-8 h-8 bg-pink-600 hover:bg-pink-500 rounded text-white font-bold shadow transition"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <!-- 骰子數量設定 (New) -->
+        <div
+          class="flex justify-between items-center mb-6 p-3 bg-gray-700 rounded-lg"
+        >
+          <span class="text-lg font-bold text-gray-200">🎲 主頁骰子數量</span>
+          <div class="flex items-center space-x-3">
+            <button
+              id="setting-dice-minus"
+              class="w-8 h-8 bg-gray-600 hover:bg-gray-500 rounded text-white font-bold transition"
+            >
+              -
+            </button>
+            <span
+              id="setting-dice-display"
+              class="text-xl font-bold text-purple-400 w-6 text-center"
+              >1</span
+            >
+            <button
+              id="setting-dice-plus"
+              class="w-8 h-8 bg-purple-600 hover:bg-purple-500 rounded text-white font-bold shadow transition"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <!-- 地圖方向設定 (New) -->
+        <div
+          class="flex justify-between items-center mb-6 p-3 bg-gray-700 rounded-lg"
+        >
+          <span class="text-lg font-bold text-gray-200">🧭 地圖方向</span>
+          <div class="flex space-x-2">
+            <button
+              id="setting-orientation-landscape"
+              class="px-3 py-1 rounded bg-gray-600 text-gray-300 hover:bg-gray-500 font-bold transition text-sm"
+            >
+              橫向
+            </button>
+            <button
+              id="setting-orientation-portrait"
+              class="px-3 py-1 rounded bg-gray-600 text-gray-300 hover:bg-gray-500 font-bold transition text-sm"
+            >
+              直向
+            </button>
+          </div>
+        </div>
+
+        <!-- 備份與還原 (New) -->
+        <div class="mt-6 pt-4 border-t border-gray-700">
+          <h3 class="text-gray-400 text-sm font-bold mb-2">💾 備份與還原</h3>
+          <div class="flex space-x-2">
+            <button
+              id="export-btn"
+              class="flex-1 bg-blue-700 hover:bg-blue-600 text-white font-bold py-2 rounded-lg transition flex items-center justify-center space-x-2"
+            >
+              <span>📤</span> <span>匯出設定</span>
+            </button>
+            <button
+              id="import-btn"
+              class="flex-1 bg-green-700 hover:bg-green-600 text-white font-bold py-2 rounded-lg transition flex items-center justify-center space-x-2"
+            >
+              <span>📥</span> <span>匯入設定</span>
+            </button>
+            <input
+              type="file"
+              id="import-file-input"
+              class="hidden"
+              accept=".json"
+            />
+          </div>
+        </div>
+
+        <!-- 重置遊戲 -->
+        <div class="mt-6 pt-4 border-t border-gray-700">
+          <button
+            id="full-reset-btn"
+            class="w-full bg-red-900 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-3 rounded-xl transition flex items-center justify-center space-x-2"
+          >
+            <span>⚠️</span> <span>重置所有遊戲進度</span>
+          </button>
+        </div>
+      </div>
+
+      <button
+        id="settings-back-btn"
+        class="mt-8 text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
+    <!-- 設定頁面 (Setup Screen) -->
+    <div
+      id="setup-screen"
+      class="fixed inset-0 z-50 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <div
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl p-6 border border-purple-500 shadow-2xl neon-box max-h-[90vh] overflow-y-auto custom-scrollbar"
+      >
+        <h1
+          class="text-3xl font-black text-center text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 neon-text mb-6"
+        >
+          玩家設定
+        </h1>
+
+        <div class="mb-2 text-gray-400 text-sm text-center">
+          請輸入玩家名稱 (2-12人)
+        </div>
+
+        <!-- 玩家輸入列表 -->
+        <div
+          id="player-inputs"
+          class="space-y-3 mb-6 max-h-60 overflow-y-auto px-1"
+        >
+          <!-- JS 會動態產生輸入框 -->
+        </div>
+
+        <!-- 自訂懲罰 (新增) -->
+        <div class="mb-6 border-t border-gray-700 pt-4">
+          <div
+            class="text-gray-400 text-xs mb-2 flex justify-between items-center"
+          >
+            <span>自訂懲罰 (將加入命運卡)</span>
+            <span id="custom-card-count" class="text-pink-500 font-bold"
+              >0</span
+            >
+          </div>
+          <div class="flex space-x-2 mb-2">
+            <input
+              id="setup-card-input"
+              type="text"
+              placeholder="輸入懲罰內容 (例如: 伏地挺身20下)"
+              class="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-pink-500 border border-gray-600"
+            />
+            <button
+              id="setup-add-card-btn"
+              class="bg-gray-700 hover:bg-gray-600 text-pink-500 font-bold px-3 py-2 rounded-lg border border-gray-600 transition"
+            >
+              +
+            </button>
+          </div>
+          <div
+            id="setup-cards-container"
+            class="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar"
+          >
+            <!-- JS 動態生成標籤 -->
+          </div>
+        </div>
+
+        <!-- 控制按鈕 -->
+        <div class="flex space-x-2 mb-6">
+          <button
+            id="add-player-btn"
+            class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition border border-gray-600"
+          >
+            + 新增玩家
+          </button>
+          <button
+            id="remove-player-btn"
+            class="w-12 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition border border-gray-600 flex items-center justify-center"
+          >
+            -
+          </button>
+        </div>
+
+        <button
+          id="start-game-btn"
+          class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transform transition hover:scale-105"
+        >
+          開始遊戲
+        </button>
+      </div>
+    </div>
+
+    <!-- 遊戲主容器 -->
+    <div
+      id="game-container"
+      class="fixed inset-0 z-0 p-1 flex items-center justify-center hidden"
+    >
+      <!-- 地圖區域：Grid (JS 動態生成) -->
+      <div id="game-grid" class="grid gap-0.5 w-full max-h-full mx-auto">
+        <!-- === 中心控制區 (Center Panel) === -->
+        <div
+          id="center-panel"
+          class="col-span-8 row-span-4 bg-gray-900 rounded-xl border-2 border-purple-500 neon-box relative z-0 overflow-hidden"
+        >
+          <div class="flex h-full w-full">
+            <!-- Left: Title & Info -->
+            <div
+              id="center-left-panel"
+              class="hidden md:flex flex-1 flex flex-col justify-center items-center p-2 md:p-4 border-r border-gray-800 bg-gray-800 bg-opacity-30 cursor-pointer hover:bg-gray-700 hover:bg-opacity-40 transition relative overflow-hidden"
+              onclick="resetCenterInfo()"
+            >
+              <!-- Default View (Title) -->
+              <div
+                id="center-default-view"
+                class="text-center transition-opacity duration-300"
+              >
+                <div class="text-xl md:text-5xl mb-2 animate-bounce">🍻</div>
+                <h1
+                  class="text-sm md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 neon-text leading-tight"
+                >
+                  酒精<br />大富翁
+                </h1>
+                <div
+                  class="mt-2 text-[8px] md:text-[10px] text-gray-500 tracking-[0.2em] uppercase"
+                >
+                  Alcohol Monopoly
+                </div>
+              </div>
+
+              <!-- Tile Info View (Hidden by default) -->
+              <div
+                id="center-tile-view"
+                class="absolute inset-0 flex flex-col justify-center items-center p-4 text-center hidden opacity-0 transition-opacity duration-300 bg-gray-900 bg-opacity-95 w-full h-full z-10"
+              >
+                <div
+                  id="center-tile-icon"
+                  class="text-3xl md:text-7xl mb-3 filter drop-shadow-lg transform transition-transform hover:scale-110"
+                ></div>
+                <h2
+                  id="center-tile-title"
+                  class="text-lg md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 neon-text mb-2"
+                ></h2>
+                <div
+                  class="w-12 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mb-3 opacity-80"
+                ></div>
+                <p
+                  id="center-tile-desc"
+                  class="text-sm md:text-base text-gray-200 leading-relaxed max-w-[90%] font-medium"
+                ></p>
+                <div
+                  class="mt-4 text-[10px] text-gray-500 uppercase tracking-widest opacity-60"
+                >
+                  點擊關閉
+                </div>
+              </div>
+            </div>
+
+            <!-- Center: Action Area -->
+            <div
+              class="flex-[2] flex flex-col items-center justify-center p-2 relative"
+            >
+              <!-- Mobile Player Info (New: 手機版專用玩家資訊) -->
+              <div class="md:hidden w-full text-center mb-2">
+                <div
+                  id="mobile-player-name"
+                  class="text-xl font-bold text-white"
+                ></div>
+                <div class="text-yellow-400 font-bold text-sm">
+                  🍺 <span id="mobile-player-drinks">0</span> 杯
+                </div>
+                <div
+                  id="mobile-player-shields"
+                  class="hidden text-gray-400 text-xs font-bold mt-1 cursor-pointer hover:text-yellow-300 animate-pulse"
+                >
+                  🛡️ <span id="mobile-player-shield-count">0</span> (點擊使用)
+                </div>
+              </div>
+
+              <!-- 骰子顯示區 -->
+              <div
+                id="main-dice-wrapper"
+                class="flex flex-wrap justify-center gap-4 mb-4 min-h-[5rem] items-center transition-all"
+              >
+                <!-- JS 動態生成骰子 -->
+              </div>
+
+              <!-- 控制按鈕 -->
+              <button
+                id="roll-btn"
+                class="group relative w-40 md:w-56 overflow-hidden rounded-full bg-gradient-to-r from-pink-500 to-purple-600 p-0.5 shadow-lg transition-all hover:scale-105 active:scale-95"
+              >
+                <span
+                  class="relative block rounded-full bg-gray-900 px-4 py-3 text-white transition-all group-hover:bg-opacity-0 font-bold text-sm md:text-xl"
+                >
+                  🎲 擲骰子
+                </span>
+              </button>
+            </div>
+
+            <!-- Right: Current Player -->
+            <div
+              class="hidden md:flex flex-1 flex flex-col justify-center items-center p-2 md:p-4 border-l border-gray-800 bg-gray-800 bg-opacity-30"
+            >
+              <div
+                class="text-[10px] md:text-xs text-gray-400 mb-2 uppercase tracking-wider font-bold"
+              >
+                Current Turn
+              </div>
+              <div
+                id="current-player-name"
+                class="text-sm md:text-2xl font-bold text-white text-center break-words w-full px-2"
+              >
+                準備開始
+              </div>
+              <!-- 累積杯數顯示 -->
+              <div
+                class="mt-2 text-yellow-400 font-mono font-bold text-sm md:text-base"
+              >
+                🍺 <span id="current-player-drinks">0</span> 杯
+              </div>
+              <!-- 免死金牌顯示 (有金牌時顯示) -->
+              <div
+                id="current-player-shields"
+                class="mt-1 text-gray-400 text-xs font-bold cursor-pointer hover:text-yellow-300 transition hidden select-none animate-pulse"
+                title="點擊使用免死金牌抵銷一杯"
+              >
+                🛡️ <span id="current-player-shield-count">0</span> (點擊使用)
+              </div>
+              <!-- 裝飾性進度條 -->
+              <div
+                class="mt-4 w-12 md:w-16 h-1.5 rounded-full bg-gray-700 overflow-hidden"
+              >
+                <div
+                  class="h-full bg-gradient-to-r from-yellow-400 to-orange-500 w-full animate-pulse"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 玩家棋子容器 (絕對定位覆蓋在地圖上) -->
+      <div
+        id="players-layer"
+        class="absolute inset-0 pointer-events-none w-full h-full"
+      >
+        <!-- 範例棋子: 之後會用 JS 動態生成並計算位置 -->
+        <!-- <div class="player-token absolute w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-md" style="top: 2%; left: 2%;"></div> -->
+      </div>
+    </div>
+
+    <!-- 歷史紀錄 (History) -->
+    <div
+      id="history-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500 neon-text mb-6"
+      >
+        📜 歷史紀錄
+      </h2>
+
+      <div
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl border border-gray-600 shadow-2xl overflow-hidden flex-1 max-h-[70vh] flex flex-col p-4"
+      >
+        <div
+          id="history-log"
+          class="space-y-2 text-sm overflow-y-auto pr-1 custom-scrollbar flex-1"
+        >
+          <div class="text-gray-500 italic text-center py-2">尚無紀錄...</div>
+        </div>
+      </div>
+
+      <button
+        id="history-back-btn"
+        class="mt-8 text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
+    <!-- 彈窗 Modal (隱藏狀態) -->
+    <div
+      id="event-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 hidden opacity-0 transition-opacity duration-300"
+    >
+      <!-- 翻轉卡片容器 -->
+      <div
+        id="modal-card-container"
+        class="relative w-full h-full md:w-full md:max-w-sm md:h-96 perspective-1000 cursor-pointer transform scale-95 transition-transform duration-300 p-4 md:p-0"
+      >
+        <div
+          id="modal-flip-inner"
+          class="relative w-full h-full transition-transform duration-700 transform-style-3d"
+        >
+          <!-- 正面 (卡背 - 點擊前顯示) -->
+          <div
+            class="absolute inset-0 backface-hidden bg-gray-800 rounded-2xl border-4 border-gray-600 flex flex-col items-center justify-center shadow-2xl z-20"
+            id="modal-front-face"
+          >
+            <div id="modal-front-icon" class="text-8xl mb-6 animate-bounce">
+              ❓
+            </div>
+            <h3
+              id="modal-front-title"
+              class="text-4xl font-black text-white tracking-widest"
+            >
+              機會
+            </h3>
+            <p class="text-gray-400 mt-6 text-sm animate-pulse">👆 點擊翻開</p>
+          </div>
+
+          <!-- 背面 (內容 - 翻開後顯示) -->
+          <div
+            class="absolute inset-0 backface-hidden rotate-y-180 bg-gray-800 rounded-2xl border-4 border-pink-500 p-4 md:p-6 flex flex-col justify-between shadow-2xl z-10"
+          >
+            <div
+              class="text-center mt-2 md:mt-4 flex-1 flex flex-col items-center w-full"
+              style="min-height: 0"
+            >
+              <h3
+                id="modal-back-title"
+                class="text-2xl md:text-3xl font-bold text-pink-500 mb-2 md:mb-4 flex-shrink-0 px-2"
+              >
+                ...
+              </h3>
+              <div
+                class="w-16 h-1 bg-gradient-to-r from-purple-500 to-pink-500 mx-auto mb-2 md:mb-4 rounded flex-shrink-0"
+              ></div>
+              <p
+                id="modal-back-desc"
+                class="text-white text-base md:text-xl leading-relaxed font-medium overflow-y-auto custom-scrollbar w-full px-2 whitespace-pre-line flex-1"
+              >
+                ...
+              </p>
+            </div>
+            <div class="w-full space-y-2">
+              <button
+                id="close-modal-btn"
+                class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-xl transition shadow-lg"
+              >
+                知道了 (關閉)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 幫助與說明 (Help) -->
+    <div
+      id="help-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-500 neon-text mb-6"
+      >
+        ℹ️ 幫助與說明
+      </h2>
+
+      <div
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl border border-blue-500 shadow-2xl overflow-hidden flex-1 max-h-[70vh] flex flex-col p-4"
+      >
+        <div
+          class="overflow-y-auto custom-scrollbar flex-1 space-y-4 text-gray-300 text-sm leading-relaxed pr-2"
+        >
+          <!-- 版本資訊 -->
+          <div class="bg-gray-900 p-3 rounded-lg border border-gray-700">
+            <h3 class="text-white font-bold text-lg mb-1">
+              🍺 酒精大富翁 v1.2
+            </h3>
+            <p class="text-gray-400 text-xs">專為派對設計的網頁版酒桌遊戲。</p>
+          </div>
+
+          <!-- 詳細功能介紹 -->
+          <div class="space-y-4">
+            <div>
+              <h3
+                class="text-yellow-400 font-bold text-base mb-2 border-b border-gray-700 pb-1"
+              >
+                🛡️ 免死金牌系統
+              </h3>
+              <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
+                <li>
+                  <strong class="text-gray-200">獲得方式：</strong
+                  >經過「起點」或抽取特定「機會卡」。
+                </li>
+                <li>
+                  <strong class="text-gray-200">自動抵銷：</strong
+                  >當遇到懲罰時，若持有金牌可選擇抵銷。
+                </li>
+                <li>
+                  <strong class="text-gray-200">主動使用：</strong
+                  >在主畫面點擊自己的金牌圖示，可主動抵銷 1 杯酒。
+                </li>
+                <li>
+                  <strong class="text-gray-200">贈送：</strong
+                  >在「玩家列表」中可手動給予其他玩家金牌。
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3
+                class="text-blue-400 font-bold text-base mb-2 border-b border-gray-700 pb-1"
+              >
+                👥 玩家管理與觀戰
+              </h3>
+              <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
+                <li>
+                  <strong class="text-gray-200">觀戰模式：</strong
+                  >在玩家列表點擊「👁️」或勾選觀戰，該玩家將跳過擲骰但保留在場上。
+                </li>
+                <li>
+                  <strong class="text-gray-200">暫停/廁所：</strong
+                  >點擊「暫停」可暫時跳過一回合。
+                </li>
+                <li>
+                  <strong class="text-gray-200">刪除玩家：</strong
+                  >在列表「長按」玩家頭像可將其移除。
+                </li>
+                <li>
+                  <strong class="text-gray-200">新增玩家：</strong
+                  >遊戲途中可隨時新增加入戰局。
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3
+                class="text-pink-400 font-bold text-base mb-2 border-b border-gray-700 pb-1"
+              >
+                🃏 卡牌與地圖自訂
+              </h3>
+              <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
+                <li>
+                  <strong class="text-gray-200">卡牌管理：</strong
+                  >可新增、編輯、刪除「機會/命運」卡牌內容，或一鍵重置為預設值。
+                </li>
+                <li>
+                  <strong class="text-gray-200">地圖編輯：</strong
+                  >支援直向/橫向切換，可自訂格子類型與文字，或使用「隨機生成」。
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3
+                class="text-green-400 font-bold text-base mb-2 border-b border-gray-700 pb-1"
+              >
+                💾 系統與存檔
+              </h3>
+              <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
+                <li>
+                  <strong class="text-gray-200">自動存檔：</strong
+                  >所有進度皆會自動儲存在瀏覽器中。
+                </li>
+                <li>
+                  <strong class="text-gray-200">備份還原：</strong
+                  >在設定頁面可「匯出」設定檔(JSON)分享給朋友，或「匯入」進度。
+                </li>
+                <li>
+                  <strong class="text-gray-200">遊戲結算：</strong
+                  >當有人達到設定的杯數上限(預設20杯)時，觸發結算畫面。
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3
+                class="text-purple-400 font-bold text-base mb-2 border-b border-gray-700 pb-1"
+              >
+                🎮 其他操作
+              </h3>
+              <ul class="list-disc list-inside space-y-1 text-gray-400 text-xs">
+                <li>
+                  <strong class="text-gray-200">快捷鍵：</strong>電腦版按
+                  <kbd class="bg-gray-700 px-1 rounded border border-gray-600"
+                    >Space</kbd
+                  >
+                  可擲骰子。
+                </li>
+                <li>
+                  <strong class="text-gray-200">排行榜截圖：</strong
+                  >在排行榜頁面點擊「📸」可下載戰績截圖。
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button
+        id="help-back-btn"
+        class="mt-8 text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
+    <!-- 腳本區域 -->
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+
+    <!-- 註冊 PWA Service Worker -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("sw.js")
+            .then((reg) => console.log("SW registered!", reg))
+            .catch((err) => console.log("SW failed", err));
+        });
+      }
+    </script>
+  </body>
+</html>
