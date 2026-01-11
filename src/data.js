@@ -255,3 +255,79 @@ const DEFAULT_FATE_CARDS = [
 ];
 
 let fateCards = [...DEFAULT_FATE_CARDS];
+
+// === 全域事件資料庫 ===
+const DEFAULT_GLOBAL_EVENTS = [
+  {
+    title: "🌪️ 大風吹",
+    desc: "所有人向左換一個位置！(交換棋子)",
+    action: "swap",
+  },
+  {
+    title: "📈 通貨膨脹",
+    desc: "物價上漲！所有人喝一杯！",
+    action: "inflation",
+  },
+  {
+    title: "🎁 特赦天下",
+    desc: "普天同慶！所有人獲得一張免死金牌！",
+    action: "amnesty",
+  },
+  {
+    title: "📉 經濟泡沫",
+    desc: "好康大放送！所有人減一杯！",
+    action: "deflation",
+  },
+  {
+    title: "🤫 靜音模式",
+    desc: "接下來一回合禁止說話，發出聲音的人喝一杯！",
+    action: "text",
+  },
+  {
+    title: "📸 照相機",
+    desc: "所有人定格不動！最後一個動的人喝一杯！",
+    action: "text",
+  },
+  {
+    title: "📱 電量焦慮",
+    desc: "所有人拿出手機，電量最低的人喝一杯！",
+    action: "text",
+  },
+  {
+    title: "🤸 全民運動",
+    desc: "所有人起立蹲下 10 次，最後完成的人喝！",
+    action: "text",
+  },
+  {
+    title: "👆 指手指",
+    desc: "數到三指向現場最色的人，被指最多的人喝！",
+    action: "text",
+  },
+  {
+    title: "🎤 我是歌手",
+    desc: "從莊家開始一人唱一句歌，接不下去的喝！",
+    action: "text",
+  },
+  {
+    title: "👀 眼神確認",
+    desc: "和左邊的人深情對視 10 秒，先笑的人喝！",
+    action: "text",
+  },
+  {
+    title: "🤝 友誼之手",
+    desc: "所有人跟右邊的人握手說「辛苦了」，慢的喝！",
+    action: "text",
+  },
+  {
+    title: "🌈 顏色獵人",
+    desc: "身上沒有「黑色」衣物或配件的人喝一杯！",
+    action: "text",
+  },
+  {
+    title: "👑 國王遊戲",
+    desc: "杯數最多的人可以指定任意一人做一件事！",
+    action: "text",
+  },
+];
+
+let globalEvents = [...DEFAULT_GLOBAL_EVENTS];

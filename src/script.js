@@ -4,6 +4,8 @@
 let players = [];
 let currentPlayerIndex = 0;
 let isAnimating = false;
+let roundCounter = 0;
+let isGlobalEventModal = false;
 
 // DOM 元素
 const landingPage = document.getElementById("landing-page");
@@ -16,6 +18,9 @@ const timerContainer = document.getElementById("timer-container"); // 新增
 const leaderboardContainer = document.getElementById("leaderboard-container"); // 新增
 const settingsContainer = document.getElementById("settings-container"); // 新增
 const cardsContainer = document.getElementById("cards-container"); // 新增
+const globalEventsContainer = document.getElementById(
+  "global-events-container"
+); // 新增
 const mapEditorContainer = document.getElementById("map-editor-container"); // 新增
 const historyContainer = document.getElementById("history-container"); // 新增
 const helpContainer = document.getElementById("help-container"); // 新增
@@ -101,6 +106,18 @@ const cardsTabFate = document.getElementById("cards-tab-fate"); // 新增
 const resetCardsBtn = document.getElementById("reset-cards-btn"); // 新增
 const helpBackBtn = document.getElementById("help-back-btn"); // 新增
 
+// === 全域事件管理 DOM ===
+const globalEventsBackBtn = document.getElementById("global-events-back-btn"); // 新增
+const globalEventsList = document.getElementById("global-events-list"); // 新增
+const newGeTitle = document.getElementById("new-ge-title"); // 新增
+const newGeDesc = document.getElementById("new-ge-desc"); // 新增
+const newGeAction = document.getElementById("new-ge-action"); // 新增
+const addGeBtn = document.getElementById("add-ge-btn"); // 新增
+const resetGeBtn = document.getElementById("reset-ge-btn"); // 新增
+const geIntervalMinus = document.getElementById("ge-interval-minus"); // 新增
+const geIntervalPlus = document.getElementById("ge-interval-plus"); // 新增
+const geIntervalDisplay = document.getElementById("ge-interval-display"); // 新增
+
 // === 結算畫面 DOM ===
 const gameOverList = document.getElementById("game-over-list");
 const gameOverReason = document.getElementById("game-over-reason");
@@ -110,6 +127,8 @@ const soundToggleBtn = document.getElementById("sound-toggle-btn");
 const soundToggleCircle = document.getElementById("sound-toggle-circle");
 const bgmToggleBtn = document.getElementById("bgm-toggle-btn"); // 新增
 const bgmToggleCircle = document.getElementById("bgm-toggle-circle"); // 新增
+const partyToggleBtn = document.getElementById("party-toggle-btn"); // 新增
+const partyToggleCircle = document.getElementById("party-toggle-circle"); // 新增
 const settingDiceMinus = document.getElementById("setting-dice-minus");
 const settingDicePlus = document.getElementById("setting-dice-plus");
 const settingDiceDisplay = document.getElementById("setting-dice-display");
@@ -175,6 +194,8 @@ const bgm = new Audio("sounds/bgm.mp3");
 bgm.loop = true; // 設定循環播放
 let isBgmMuted = true; // 預設關閉
 
+let isPartyMode = false; // 派對模式狀態
+
 function playSound(effect) {
   if (!isMuted && audioEffects[effect]) {
     audioEffects[effect].currentTime = 0;
@@ -214,6 +235,7 @@ function backToGame() {
   historyContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
   playersContainer.classList.add("hidden"); // 新增
+  globalEventsContainer.classList.add("hidden"); // 新增
   gameOverContainer.classList.add("hidden"); // 新增
   gameContainer.classList.remove("hidden");
 }
@@ -257,6 +279,9 @@ function handleMenuAction(target) {
       break;
     case "cards":
       initCards();
+      break;
+    case "global-events":
+      initGlobalEvents();
       break;
     case "map":
       initMapEditorPage();
@@ -364,6 +389,7 @@ function initDice() {
   cardsContainer.classList.add("hidden");
   mapEditorContainer.classList.add("hidden");
   playersContainer.classList.add("hidden");
+  globalEventsContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
   diceContainer.classList.remove("hidden");
 
@@ -502,6 +528,7 @@ function initTimer() {
   diceContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
   playersContainer.classList.add("hidden");
+  globalEventsContainer.classList.add("hidden");
   timerContainer.classList.remove("hidden");
 
   // 綁定按鈕
@@ -613,6 +640,7 @@ function initLeaderboard() {
   mapEditorContainer.classList.add("hidden");
   playersContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
+  globalEventsContainer.classList.add("hidden");
   leaderboardContainer.classList.remove("hidden");
 
   leaderboardBackBtn.onclick = closeLeaderboard;
@@ -742,6 +770,7 @@ function initHistory() {
   mapEditorContainer.classList.add("hidden");
   playersContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
+  globalEventsContainer.classList.add("hidden");
   historyContainer.classList.remove("hidden");
 
   historyBackBtn.onclick = closeHistory;
@@ -767,6 +796,7 @@ function initCards() {
   cardsContainer.classList.remove("hidden");
   mapEditorContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
+  globalEventsContainer.classList.add("hidden");
 
   cardsBackBtn.onclick = () => backToGame();
   cardsTabChance.onclick = () => switchCardsTab("chance");
@@ -776,6 +806,103 @@ function initCards() {
 
   // 初始化顯示
   switchCardsTab("chance");
+}
+
+// === 全域事件管理頁面邏輯 ===
+let globalEventInterval = 3; // 預設 3 回合
+
+function initGlobalEvents() {
+  // 切換介面
+  gameContainer.classList.add("hidden");
+  historyContainer.classList.add("hidden");
+  rouletteContainer.classList.add("hidden");
+  timerContainer.classList.add("hidden");
+  leaderboardContainer.classList.add("hidden");
+  diceContainer.classList.add("hidden");
+  settingsContainer.classList.add("hidden");
+  cardsContainer.classList.add("hidden");
+  mapEditorContainer.classList.add("hidden");
+  playersContainer.classList.add("hidden");
+  helpContainer.classList.add("hidden");
+  globalEventsContainer.classList.remove("hidden");
+
+  globalEventsBackBtn.onclick = () => backToGame();
+  addGeBtn.onclick = addGlobalEvent;
+  resetGeBtn.onclick = resetGlobalEvents;
+  geIntervalMinus.onclick = () => updateGeInterval(-1);
+  geIntervalPlus.onclick = () => updateGeInterval(1);
+
+  updateGeInterval(0); // 更新顯示
+  renderGlobalEventsList();
+}
+
+function updateGeInterval(delta) {
+  let newInterval = globalEventInterval + delta;
+  if (newInterval < 1) newInterval = 1;
+  if (newInterval > 10) newInterval = 10;
+  globalEventInterval = newInterval;
+  geIntervalDisplay.innerText = globalEventInterval;
+  saveGame();
+}
+
+function renderGlobalEventsList() {
+  globalEventsList.innerHTML = "";
+  const actionLabels = {
+    text: "📝 純文字",
+    swap: "🌪️ 交換",
+    inflation: "📈 通膨",
+    amnesty: "🎁 特赦",
+    deflation: "📉 泡沫",
+  };
+
+  globalEvents.forEach((event, index) => {
+    const div = document.createElement("div");
+    div.className =
+      "bg-gray-800 p-2 rounded border border-gray-700 flex flex-col space-y-1";
+    div.innerHTML = `
+      <div class="flex justify-between items-center">
+        <span class="font-bold text-green-400 text-sm">${event.title}</span>
+        <div class="flex items-center space-x-2">
+            <span class="text-xs text-gray-500 bg-gray-900 px-1 rounded">${
+              actionLabels[event.action] || event.action
+            }</span>
+            <button onclick="removeGlobalEvent(${index})" class="text-red-500 hover:text-red-400 font-bold">×</button>
+        </div>
+      </div>
+      <div class="text-xs text-gray-300">${event.desc}</div>
+    `;
+    globalEventsList.appendChild(div);
+  });
+}
+
+window.removeGlobalEvent = function (index) {
+  globalEvents.splice(index, 1);
+  renderGlobalEventsList();
+  saveGame();
+};
+
+function addGlobalEvent() {
+  const title = newGeTitle.value.trim();
+  const desc = newGeDesc.value.trim();
+  const action = newGeAction.value;
+
+  if (title && desc) {
+    globalEvents.push({ title, desc, action });
+    newGeTitle.value = "";
+    newGeDesc.value = "";
+    renderGlobalEventsList();
+    saveGame();
+  } else {
+    alert("請輸入標題與描述！");
+  }
+}
+
+function resetGlobalEvents() {
+  if (confirm("確定要重置為預設的全域事件嗎？")) {
+    globalEvents = [...DEFAULT_GLOBAL_EVENTS];
+    renderGlobalEventsList();
+    saveGame();
+  }
 }
 
 // === 地圖編輯器頁面邏輯 ===
@@ -791,6 +918,7 @@ function initMapEditorPage() {
   cardsContainer.classList.add("hidden");
   playersContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
+  globalEventsContainer.classList.add("hidden");
   mapEditorContainer.classList.remove("hidden");
 
   mapEditorBackBtn.onclick = () => backToGame();
@@ -830,10 +958,12 @@ function initSettings() {
   mapEditorContainer.classList.add("hidden");
   playersContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
+  globalEventsContainer.classList.add("hidden");
 
   // 綁定事件
   soundToggleBtn.onclick = toggleSound;
   bgmToggleBtn.onclick = toggleBgm; // 新增 BGM 切換事件
+  partyToggleBtn.onclick = togglePartyMode; // 新增派對模式切換
   settingDiceMinus.onclick = () => updateMainDiceSetting(-1);
   settingDicePlus.onclick = () => updateMainDiceSetting(1);
   settingLimitMinus.onclick = () => updateLimitSetting(-5);
@@ -856,6 +986,7 @@ function initSettings() {
   // 初始化顯示
   updateSoundUI();
   updateBgmUI(); // 新增 BGM UI 初始化
+  updatePartyUI(); // 新增派對模式 UI 初始化
   settingDiceDisplay.innerText = mainGameDiceCount;
   settingLimitDisplay.innerText = maxDrinksLimit;
   updateOrientationUI();
@@ -893,6 +1024,24 @@ function updateBgmUI() {
   } else {
     bgmToggleBtn.classList.replace("bg-gray-500", "bg-green-500");
     bgmToggleCircle.classList.replace("left-1", "left-7");
+  }
+}
+
+function togglePartyMode() {
+  isPartyMode = !isPartyMode;
+  updatePartyUI();
+  saveGame(); // 儲存設定
+}
+
+function updatePartyUI() {
+  if (isPartyMode) {
+    document.body.classList.add("party-mode");
+    partyToggleBtn.classList.replace("bg-gray-500", "bg-pink-600");
+    partyToggleCircle.classList.replace("left-1", "left-7");
+  } else {
+    document.body.classList.remove("party-mode");
+    partyToggleBtn.classList.replace("bg-pink-600", "bg-gray-500");
+    partyToggleCircle.classList.replace("left-7", "left-1");
   }
 }
 
@@ -1056,6 +1205,7 @@ function initPlayers() {
   cardsContainer.classList.add("hidden");
   mapEditorContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
+  globalEventsContainer.classList.add("hidden");
 
   playersContainer.classList.remove("hidden");
 
@@ -1080,6 +1230,7 @@ function initHelp() {
   mapEditorContainer.classList.add("hidden");
   playersContainer.classList.add("hidden");
   helpContainer.classList.remove("hidden");
+  globalEventsContainer.classList.add("hidden");
 
   helpBackBtn.onclick = backToGame;
 }
@@ -2141,7 +2292,8 @@ function handleTileEvent(pos, roll) {
   if (mapData.find((t) => t.id === pos).type === "jail")
     players[currentPlayerIndex].isSkipped = true;
 }
-function showModal(t, d, type) {
+function showModal(t, d, type, isGlobal = false) {
+  isGlobalEventModal = isGlobal;
   // 為了讓 adjustDrink 在 HTML onclick 中可用，需掛載到 window
   if (!window.adjustDrink) {
     window.adjustDrink = adjustDrink;
@@ -2220,6 +2372,15 @@ function closeModal(e) {
   setTimeout(() => {
     modal.classList.add("hidden");
 
+    // === 全域事件彈窗關閉邏輯 ===
+    if (isGlobalEventModal) {
+      isGlobalEventModal = false;
+      saveGame(); // 僅存檔，不推進回合
+      return;
+    }
+
+    const previousIndex = currentPlayerIndex;
+
     // 輪替邏輯：跳過觀戰中的玩家
     let loopCount = 0;
     do {
@@ -2230,12 +2391,73 @@ function closeModal(e) {
       loopCount < players.length
     );
 
+    // === 回合切換偵測 ===
+    // 當索引值變小 (例如從最後一位跳回第一位) 或單人遊玩時，視為一回合結束
+    if (
+      (players.length > 0 && currentPlayerIndex < previousIndex) ||
+      players.length === 1
+    ) {
+      handleRoundChange();
+    }
+
     updatePlayerInfo();
     isAnimating = false;
     saveGame(); // 回合結束存檔
     checkGameOver(); // 檢查是否結束
   }, 300);
 }
+
+// === 回合制全域事件邏輯 ===
+function handleRoundChange() {
+  roundCounter++;
+  // 使用設定的間隔觸發
+  if (roundCounter % globalEventInterval === 0) {
+    setTimeout(triggerGlobalEvent, 500);
+  }
+}
+
+function triggerGlobalEvent() {
+  if (globalEvents.length === 0) return; // 無事件則不觸發
+
+  const event = globalEvents[Math.floor(Math.random() * globalEvents.length)];
+  let displayDesc = event.desc;
+
+  // 執行事件效果
+  if (event.action === "swap" && players.length > 1) {
+    const lastPos = players[players.length - 1].position;
+    for (let i = players.length - 1; i > 0; i--) {
+      players[i].position = players[i - 1].position;
+    }
+    players[0].position = lastPos;
+    renderPlayers();
+  } else if (event.action === "inflation") {
+    players.forEach((p) => {
+      p.drinkCount++;
+      p.punishCount = (p.punishCount || 0) + 1;
+    });
+  } else if (event.action === "amnesty") {
+    players.forEach((p) => {
+      p.shieldCount = (p.shieldCount || 0) + 1;
+      p.totalShields = (p.totalShields || 0) + 1;
+    });
+  } else if (event.action === "deflation") {
+    players.forEach((p) => {
+      if (p.drinkCount > 0) p.drinkCount--;
+    });
+  } else if (event.title.includes("國王遊戲")) {
+    // 自動判斷國王 (杯數最多者)
+    if (players.length > 0) {
+      const maxDrinks = Math.max(...players.map((p) => p.drinkCount));
+      const kings = players.filter((p) => p.drinkCount === maxDrinks);
+      const kingNames = kings.map((p) => p.name).join("、");
+      displayDesc = `👑 當前國王：${kingNames} (累積 ${maxDrinks} 杯)\n\n${event.desc}`;
+    }
+  }
+
+  showModal(`🌍 全域事件：${event.title}`, displayDesc, "chance", true);
+  updatePlayerInfo();
+}
+
 function updatePlayerInfo() {
   // 若所有玩家皆為觀戰模式，顯示暫停狀態
   if (players.length > 0 && players.every((p) => p.isSpectator)) {
@@ -2458,6 +2680,10 @@ function saveGame(force = false) {
     fateCards,
     mainGameDiceCount,
     maxDrinksLimit, // 儲存上限設定
+    isPartyMode, // 儲存派對模式設定
+    roundCounter, // 儲存回合數
+    globalEvents, // 儲存自訂全域事件
+    globalEventInterval, // 儲存觸發頻率
     timestamp: Date.now(),
   };
   localStorage.setItem("alcohol_monopoly_save_v1", JSON.stringify(gameState));
@@ -2481,6 +2707,20 @@ function loadGame() {
     fateCards = state.fateCards;
     mainGameDiceCount = state.mainGameDiceCount;
     maxDrinksLimit = state.maxDrinksLimit || 20; // 還原上限設定
+    isPartyMode = state.isPartyMode || false; // 還原派對模式
+    roundCounter = state.roundCounter || 0; // 還原回合數
+    if (state.globalEvents) {
+      globalEvents = state.globalEvents;
+      // 自動補入新增的預設事件 (若存檔中沒有，例如新版本新增的事件)
+      const savedTitles = new Set(globalEvents.map((e) => e.title));
+      DEFAULT_GLOBAL_EVENTS.forEach((def) => {
+        if (!savedTitles.has(def.title)) {
+          globalEvents.push(def);
+        }
+      });
+    }
+    if (state.globalEventInterval)
+      globalEventInterval = state.globalEventInterval; // 還原頻率
 
     // 切換畫面
     setupScreen.classList.add("hidden");
@@ -2497,6 +2737,7 @@ function loadGame() {
     renderGameGrid();
     settingLimitDisplay.innerText = maxDrinksLimit; // 更新設定顯示
     initMapEditor(); // 確保編輯器資料同步
+    updatePartyUI(); // 套用派對模式視覺
 
     // alert("已恢復上次的遊戲進度！");
   } catch (e) {
@@ -2554,6 +2795,25 @@ function triggerConfetti() {
     ).onfinish = () => el.remove();
   }
 }
+
+// === 全域點擊特效 ===
+window.addEventListener("click", (e) => {
+  const ripple = document.createElement("div");
+  ripple.className = "click-ripple";
+  ripple.style.left = `${e.clientX}px`;
+  ripple.style.top = `${e.clientY}px`;
+
+  // 派對模式下使用隨機霓虹色
+  if (typeof isPartyMode !== "undefined" && isPartyMode) {
+    const colors = ["#ec4899", "#8b5cf6", "#fbbf24", "#10b981", "#3b82f6"];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    ripple.style.borderColor = color;
+    ripple.style.backgroundColor = color + "33"; // 加上透明度 (Hex Alpha)
+  }
+
+  document.body.appendChild(ripple);
+  ripple.addEventListener("animationend", () => ripple.remove());
+});
 
 // 啟動設定頁面
 initSetup();

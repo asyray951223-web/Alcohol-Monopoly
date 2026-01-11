@@ -5,6 +5,25 @@ body {
   touch-action: manipulation; /* 防止雙擊縮放 */
 }
 
+/* === 派對模式 (Party Mode) === */
+body.party-mode {
+  background: linear-gradient(-45deg, #2e1065, #831843, #1e3a8a, #064e3b);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
 /* 霓虹發光效果 */
 .neon-box {
   box-shadow: 0 0 5px rgba(236, 72, 153, 0.5), 0 0 10px rgba(236, 72, 153, 0.3);
@@ -361,4 +380,30 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(to bottom, #7c3aed, #db2777);
   box-shadow: 0 0 8px rgba(236, 72, 153, 0.6); /* 霓虹發光 */
+}
+
+/* === 點擊波紋特效 === */
+.click-ripple {
+  position: fixed;
+  width: 40px;
+  height: 40px;
+  margin-left: -20px; /* 居中定位 */
+  margin-top: -20px;
+  border-radius: 50%;
+  border: 2px solid rgba(236, 72, 153, 0.8); /* 預設粉色 */
+  background: rgba(236, 72, 153, 0.2);
+  pointer-events: none; /* 不阻擋點擊 */
+  z-index: 9999;
+  animation: rippleExpand 0.5s ease-out forwards;
+}
+
+@keyframes rippleExpand {
+  0% {
+    transform: scale(0.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
 }

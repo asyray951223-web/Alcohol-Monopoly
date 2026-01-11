@@ -230,24 +230,6 @@
           <li>
             <button
               class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
-              data-target="cards"
-            >
-              <span>🃏</span>
-              <span>卡牌管理</span>
-            </button>
-          </li>
-          <li>
-            <button
-              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
-              data-target="map"
-            >
-              <span>🗺️</span>
-              <span>地圖編輯</span>
-            </button>
-          </li>
-          <li>
-            <button
-              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
               data-target="leaderboard"
             >
               <span>🏆</span>
@@ -288,6 +270,33 @@
             >
               <span>⏱️</span>
               <span>計時器</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="cards"
+            >
+              <span>🃏</span>
+              <span>卡牌管理</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="global-events"
+            >
+              <span>🌍</span>
+              <span>全域事件</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="map"
+            >
+              <span>🗺️</span>
+              <span>地圖編輯</span>
             </button>
           </li>
           <li>
@@ -768,6 +777,109 @@
       </button>
     </div>
 
+    <!-- 全域事件管理 (Global Events) -->
+    <div
+      id="global-events-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-500 neon-text mb-6"
+      >
+        🌍 全域事件管理
+      </h2>
+
+      <div
+        class="w-[90%] md:w-full max-w-md bg-gray-800 rounded-2xl border border-gray-600 shadow-2xl overflow-hidden flex-1 max-h-[70vh] flex flex-col p-4"
+      >
+        <!-- 觸發頻率設定 -->
+        <div
+          class="mb-4 p-3 bg-gray-700 rounded-lg flex justify-between items-center"
+        >
+          <span class="text-gray-200 font-bold">觸發頻率 (回合)</span>
+          <div class="flex items-center space-x-3">
+            <button
+              id="ge-interval-minus"
+              class="w-8 h-8 bg-gray-600 hover:bg-gray-500 rounded text-white font-bold"
+            >
+              -
+            </button>
+            <span
+              id="ge-interval-display"
+              class="text-xl font-bold text-green-400 w-8 text-center"
+              >3</span
+            >
+            <button
+              id="ge-interval-plus"
+              class="w-8 h-8 bg-green-600 hover:bg-green-500 rounded text-white font-bold"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div
+          class="bg-gray-900 border border-gray-700 rounded-lg p-2 flex-1 flex flex-col min-h-0"
+        >
+          <div
+            id="global-events-list"
+            class="flex-1 overflow-y-auto space-y-2 mb-2 custom-scrollbar pr-1"
+          >
+            <!-- JS 動態生成 -->
+          </div>
+
+          <!-- 新增事件表單 -->
+          <div class="space-y-2 pt-2 border-t border-gray-700">
+            <input
+              id="new-ge-title"
+              type="text"
+              placeholder="事件標題 (例如: 全體起立)"
+              class="w-full bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-green-500 text-sm"
+            />
+            <input
+              id="new-ge-desc"
+              type="text"
+              placeholder="事件描述 (例如: 最後起立的人喝)"
+              class="w-full bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-green-500 text-sm"
+            />
+            <div class="flex space-x-2">
+              <select
+                id="new-ge-action"
+                class="flex-1 bg-gray-800 text-white rounded px-3 py-2 border border-gray-600 focus:outline-none focus:border-green-500 text-sm"
+              >
+                <option value="text">📝 純文字提示</option>
+                <option value="swap">🌪️ 大風吹 (交換位置)</option>
+                <option value="inflation">📈 通貨膨脹 (+1杯)</option>
+                <option value="amnesty">🎁 特赦天下 (+金牌)</option>
+                <option value="deflation">📉 經濟泡沫 (-1杯)</option>
+              </select>
+              <button
+                id="add-ge-btn"
+                class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-bold"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-2 pt-2 border-t border-gray-700">
+            <button
+              id="reset-ge-btn"
+              class="w-full text-xs text-gray-500 hover:text-gray-300 transition py-1"
+            >
+              ↺ 重置為預設事件
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button
+        id="global-events-back-btn"
+        class="mt-8 text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
     <!-- 地圖編輯器 (Map Editor) -->
     <div
       id="map-editor-container"
@@ -939,6 +1051,24 @@
               >
                 <div
                   id="bgm-toggle-circle"
+                  class="w-6 h-6 bg-white rounded-full absolute top-1 left-1 transition-all duration-300 shadow-md"
+                ></div>
+              </button>
+            </div>
+          </div>
+
+          <!-- 視覺設定 (New) -->
+          <div class="mb-6 p-3 bg-gray-700 rounded-lg">
+            <div class="flex justify-between items-center">
+              <span class="text-lg font-bold text-gray-200"
+                >🎉 派對模式 (Party)</span
+              >
+              <button
+                id="party-toggle-btn"
+                class="w-14 h-8 rounded-full bg-gray-500 relative transition-colors duration-300 focus:outline-none"
+              >
+                <div
+                  id="party-toggle-circle"
                   class="w-6 h-6 bg-white rounded-full absolute top-1 left-1 transition-all duration-300 shadow-md"
                 ></div>
               </button>
