@@ -1559,17 +1559,5 @@
     <!-- 腳本區域 -->
     <script src="data.js"></script>
     <script src="script.js"></script>
-
-    <!-- 註冊 PWA Service Worker -->
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker
-            .register("sw.js")
-            .then((reg) => console.log("SW registered!", reg))
-            .catch((err) => console.log("SW failed", err));
-        });
-      }
-    </script>
   </body>
 </html>
