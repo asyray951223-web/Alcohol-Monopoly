@@ -846,6 +846,7 @@ function initSettings() {
   fullResetBtn.onclick = () => {
     if (confirm("確定要重置所有遊戲進度嗎？這將回到初始畫面。")) {
       localStorage.removeItem("alcohol_monopoly_save_v1");
+      localStorage.removeItem("alcohol_custom_cards");
       location.reload();
     }
   };
