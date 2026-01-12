@@ -13,6 +13,7 @@ const enterGameBtn = document.getElementById("enter-game-btn");
 const setupScreen = document.getElementById("setup-screen");
 const gameContainer = document.getElementById("game-container");
 const rouletteContainer = document.getElementById("roulette-container"); // 新增
+const spinWheelContainer = document.getElementById("spin-wheel-container"); // 新增
 const diceContainer = document.getElementById("dice-container"); // 新增
 const timerContainer = document.getElementById("timer-container"); // 新增
 const leaderboardContainer = document.getElementById("leaderboard-container"); // 新增
@@ -84,6 +85,17 @@ const diceBackBtn = document.getElementById("dice-back-btn");
 const cylinder = document.getElementById("cylinder");
 const fireBtn = document.getElementById("fire-btn");
 const rouletteBackBtn = document.getElementById("roulette-back-btn");
+
+// === 幸運轉盤 DOM ===
+const wheelCanvas = document.getElementById("wheel-canvas");
+const spinBtn = document.getElementById("spin-btn");
+const editWheelBtn = document.getElementById("edit-wheel-btn");
+const wheelEditor = document.getElementById("wheel-editor");
+const closeWheelEditor = document.getElementById("close-wheel-editor");
+const wheelOptionsList = document.getElementById("wheel-options-list");
+const newWheelOption = document.getElementById("new-wheel-option");
+const addWheelOptionBtn = document.getElementById("add-wheel-option-btn");
+const spinWheelBackBtn = document.getElementById("spin-wheel-back-btn");
 
 // === 計時器 DOM ===
 const timerDisplay = document.getElementById("timer-display");
@@ -227,6 +239,7 @@ async function requestWakeLock() {
 function backToGame() {
   rouletteContainer.classList.add("hidden");
   diceContainer.classList.add("hidden");
+  spinWheelContainer.classList.add("hidden");
   timerContainer.classList.add("hidden");
   leaderboardContainer.classList.add("hidden");
   settingsContainer.classList.add("hidden");
@@ -294,6 +307,9 @@ function handleMenuAction(target) {
       break;
     case "dice":
       initDice();
+      break;
+    case "spin-wheel":
+      initSpinWheel();
       break;
     case "roulette":
       initRoulette();
@@ -372,6 +388,213 @@ function closeRoulette() {
   backToGame();
 }
 
+// === 幸運轉盤邏輯 ===
+let wheelState = {
+  options: ["喝一杯", "喝半杯", "指定人喝", "大冒險", "Pass", "左邊喝"],
+  colors: [
+    "#FF6384",
+    "#36A2EB",
+    "#FFCE56",
+    "#4BC0C0",
+    "#9966FF",
+    "#FF9F40",
+    "#C9CBCF",
+    "#FF9F80",
+  ],
+  angle: 0,
+  velocity: 0,
+  isSpinning: false,
+  ctx: null,
+};
+
+function initSpinWheel() {
+  // 切換介面
+  gameContainer.classList.add("hidden");
+  historyContainer.classList.add("hidden");
+  rouletteContainer.classList.add("hidden");
+  timerContainer.classList.add("hidden");
+  leaderboardContainer.classList.add("hidden");
+  settingsContainer.classList.add("hidden");
+  cardsContainer.classList.add("hidden");
+  mapEditorContainer.classList.add("hidden");
+  playersContainer.classList.add("hidden");
+  helpContainer.classList.add("hidden");
+  diceContainer.classList.add("hidden");
+  globalEventsContainer.classList.add("hidden");
+  spinWheelContainer.classList.remove("hidden");
+
+  // 初始化 Canvas
+  if (!wheelState.ctx) {
+    wheelState.ctx = wheelCanvas.getContext("2d");
+  }
+
+  // 綁定事件
+  spinBtn.onclick = startSpinWheel;
+  wheelCanvas.onclick = () => {
+    if (!wheelState.isSpinning) startSpinWheel();
+  };
+  editWheelBtn.onclick = () => wheelEditor.classList.remove("hidden");
+  closeWheelEditor.onclick = () => wheelEditor.classList.add("hidden");
+  addWheelOptionBtn.onclick = addWheelOption;
+  spinWheelBackBtn.onclick = closeSpinWheel;
+
+  // 載入儲存的轉盤選項
+  const savedOptions = localStorage.getItem("alcohol_wheel_options");
+  if (savedOptions) {
+    try {
+      wheelState.options = JSON.parse(savedOptions);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  renderWheelOptions();
+  drawWheel();
+}
+
+function drawWheel() {
+  const ctx = wheelState.ctx;
+  const width = wheelCanvas.width;
+  const height = wheelCanvas.height;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = width / 2 - 10;
+  const step = (2 * Math.PI) / wheelState.options.length;
+
+  ctx.clearRect(0, 0, width, height);
+
+  // 繪製扇形
+  wheelState.options.forEach((opt, i) => {
+    const startAngle = wheelState.angle + i * step;
+    const endAngle = wheelState.angle + (i + 1) * step;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.fillStyle = wheelState.colors[i % wheelState.colors.length];
+    ctx.fill();
+    ctx.stroke();
+
+    // 繪製文字
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(startAngle + step / 2);
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 16px Arial";
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 4;
+    ctx.fillText(opt, radius - 20, 5);
+    ctx.restore();
+  });
+}
+
+function startSpinWheel() {
+  if (wheelState.isSpinning) return;
+
+  // 確保至少有兩個選項
+  if (wheelState.options.length < 2) {
+    alert("請至少新增兩個選項！");
+    return;
+  }
+
+  wheelState.isSpinning = true;
+  wheelState.velocity = Math.random() * 0.3 + 0.4; // 初始速度
+  wheelEditor.classList.add("hidden"); // 轉動時關閉編輯器
+  playSound("dice"); // 播放音效
+
+  requestAnimationFrame(animateWheel);
+}
+
+function animateWheel() {
+  if (!wheelState.isSpinning) return;
+
+  wheelState.angle += wheelState.velocity;
+  wheelState.velocity *= 0.985; // 摩擦力減速
+
+  drawWheel();
+
+  if (wheelState.velocity < 0.002) {
+    wheelState.isSpinning = false;
+    wheelState.velocity = 0;
+    determineWheelResult();
+  } else {
+    requestAnimationFrame(animateWheel);
+  }
+}
+
+function determineWheelResult() {
+  const step = (2 * Math.PI) / wheelState.options.length;
+  // 調整角度：Canvas 0度在右邊(3點鐘)，指針在上方(-90度/270度)
+  // 我們需要計算指針指向哪個扇形
+  // 實際角度 = 當前角度 % 2PI
+  // 指針位置相對角度 = (3/2 PI - currentAngle) % 2PI
+
+  let normalizedAngle = wheelState.angle % (2 * Math.PI);
+  if (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
+
+  // 指針在上方 (270度 或 1.5 * PI)
+  // 逆推：哪個扇形覆蓋了 1.5 * PI
+  const pointerAngle = 1.5 * Math.PI;
+
+  // 計算相對偏移
+  let relativeAngle = pointerAngle - normalizedAngle;
+  if (relativeAngle < 0) relativeAngle += 2 * Math.PI;
+
+  const index = Math.floor(relativeAngle / step) % wheelState.options.length;
+  const result = wheelState.options[index];
+
+  playSound("popup");
+  showModal("轉盤結果", `🎉 結果是：\n\n${result}`);
+}
+
+function renderWheelOptions() {
+  wheelOptionsList.innerHTML = "";
+  wheelState.options.forEach((opt, index) => {
+    const div = document.createElement("div");
+    div.className =
+      "flex justify-between items-center bg-gray-700 p-2 rounded border border-gray-600";
+    div.innerHTML = `
+      <span class="text-white truncate flex-1 mr-2">${opt}</span>
+      <button onclick="removeWheelOption(${index})" class="text-red-400 hover:text-red-300 font-bold px-2">×</button>
+    `;
+    wheelOptionsList.appendChild(div);
+  });
+}
+
+function addWheelOption() {
+  const val = newWheelOption.value.trim();
+  if (val) {
+    wheelState.options.push(val);
+    newWheelOption.value = "";
+    saveWheelOptions();
+    renderWheelOptions();
+    drawWheel();
+  }
+}
+
+window.removeWheelOption = function (index) {
+  if (wheelState.options.length <= 2) {
+    alert("至少需要保留兩個選項！");
+    return;
+  }
+  wheelState.options.splice(index, 1);
+  saveWheelOptions();
+  renderWheelOptions();
+  drawWheel();
+};
+
+function saveWheelOptions() {
+  localStorage.setItem(
+    "alcohol_wheel_options",
+    JSON.stringify(wheelState.options)
+  );
+}
+
+function closeSpinWheel() {
+  backToGame();
+}
+
 // === 獨立骰子頁面邏輯 ===
 let dicePageState = {
   count: 1,
@@ -391,6 +614,7 @@ function initDice() {
   playersContainer.classList.add("hidden");
   globalEventsContainer.classList.add("hidden");
   helpContainer.classList.add("hidden");
+  spinWheelContainer.classList.add("hidden");
   diceContainer.classList.remove("hidden");
 
   // 綁定事件

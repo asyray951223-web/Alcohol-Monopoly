@@ -248,6 +248,15 @@
           <li>
             <button
               class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
+              data-target="spin-wheel"
+            >
+              <span>🎡</span>
+              <span>幸運轉盤</span>
+            </button>
+          </li>
+          <li>
+            <button
+              class="menu-item w-full text-left px-4 py-3 rounded-xl hover:bg-gray-800 transition flex items-center space-x-3 text-gray-300 hover:text-white"
               data-target="dice"
             >
               <span>🎲</span>
@@ -415,6 +424,91 @@
 
       <button
         id="dice-back-btn"
+        class="text-gray-400 hover:text-white flex items-center space-x-2 transition"
+      >
+        <span>↩️</span> <span>返回遊戲</span>
+      </button>
+    </div>
+
+    <!-- 幸運轉盤 (Spin Wheel) -->
+    <div
+      id="spin-wheel-container"
+      class="fixed inset-0 z-30 bg-gray-900 flex flex-col items-center justify-center p-4 w-full h-full hidden"
+    >
+      <h2
+        class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-500 neon-text mb-4"
+      >
+        🎡 幸運轉盤
+      </h2>
+
+      <div class="relative mb-8">
+        <!-- 指針 (固定在上方) -->
+        <div
+          class="absolute -top-6 left-1/2 transform -translate-x-1/2 z-10 text-5xl filter drop-shadow-lg"
+        >
+          🔻
+        </div>
+        <canvas
+          id="wheel-canvas"
+          width="320"
+          height="320"
+          class="rounded-full shadow-2xl border-4 border-gray-700 cursor-pointer"
+        ></canvas>
+      </div>
+
+      <div class="flex space-x-4 mb-6">
+        <button
+          id="spin-btn"
+          class="bg-gradient-to-r from-pink-600 to-yellow-600 hover:from-pink-500 hover:to-yellow-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition active:scale-95 text-xl border-b-4 border-pink-800"
+        >
+          開始轉動
+        </button>
+        <button
+          id="edit-wheel-btn"
+          class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-full shadow-lg transition border border-gray-600"
+        >
+          ✏️ 編輯
+        </button>
+      </div>
+
+      <!-- 編輯區域 (預設隱藏，絕對定位覆蓋在下方) -->
+      <div
+        id="wheel-editor"
+        class="hidden w-[90%] max-w-md bg-gray-800 rounded-xl p-4 border border-gray-700 absolute bottom-20 z-20 shadow-2xl animate-fade-in"
+      >
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-white font-bold">編輯轉盤選項</h3>
+          <button
+            id="close-wheel-editor"
+            class="text-gray-400 hover:text-white font-bold px-2"
+          >
+            ✕
+          </button>
+        </div>
+        <div
+          id="wheel-options-list"
+          class="max-h-40 overflow-y-auto space-y-2 mb-2 custom-scrollbar pr-1"
+        >
+          <!-- JS Generated -->
+        </div>
+        <div class="flex space-x-2">
+          <input
+            id="new-wheel-option"
+            type="text"
+            placeholder="新增選項..."
+            class="flex-1 bg-gray-700 text-white rounded px-2 py-2 text-sm border border-gray-600 focus:outline-none focus:border-pink-500"
+          />
+          <button
+            id="add-wheel-option-btn"
+            class="bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded font-bold"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <button
+        id="spin-wheel-back-btn"
         class="text-gray-400 hover:text-white flex items-center space-x-2 transition"
       >
         <span>↩️</span> <span>返回遊戲</span>
